@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block content %}
+{% url 'proveedores:lista' as lista_url %}
+{% include "components/form_card.html" with title="Guardar Proveedor" form=form cancel_url=lista_url submit_label="Guardar" %}
+{% endblock %}
+

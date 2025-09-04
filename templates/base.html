@@ -1,0 +1,106 @@
+{% load static %}
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}POS{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{% static 'css/site.css' %}">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script defer src="{% static 'js/site.js' %}"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+</head>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/heroicons@2.0.18/dist/heroicons.js"></script>
+
+<body>
+  <br />
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="brand">
+      <span class="logo"><i class="fas fa-money-bill-trend-up text-white text-l"></i></span>
+      <span class="brand-name text-l saira-100">PapaMarket</span>
+    </div>
+
+    <nav class="menu">
+      <a href="/" class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-home"></i></span>
+        <span class="menu-text">INICIO</span>
+      </a>
+
+      <a href="/proveedores" class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-truck"></i></span>
+        <span class="menu-text">Proveedores</span>
+      </a>
+
+      <a href="{% url 'ventas:pos' %}" class="menu-item {% if request.resolver_match.app_name == 'ventas' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-cash-register"></i></span>
+        <span class="menu-text">Ventas</span>
+      </a>
+
+      <a href="{% url 'productos:lista' %}" class="menu-item {% if request.resolver_match.app_name == 'productos' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-gift"></i></span>
+        <span class="menu-text">Productos</span>
+      </a>
+
+      <a href="{% url 'tiendas:lista' %}" class="menu-item {% if request.resolver_match.app_name == 'tiendas' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-store"></i></span>
+        <span class="menu-text">Tienda</span>
+      </a>
+
+      <a href="{% url 'clientes:lista' %}" class="menu-item {% if request.resolver_match.app_name == 'clientes' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-users"></i></span>
+        <span class="menu-text">Clientes</span>
+      </a>
+
+      <a href="{% url 'caja:panel' %}" class="menu-item {% if request.resolver_match.app_name == 'caja' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-coins"></i></span>
+        <span class="menu-text">Caja</span>
+      </a>
+
+      <a href="{% url 'creditos:panel' %}" class="menu-item {% if request.resolver_match.app_name == 'creditos' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-credit-card"></i></span>
+        <span class="menu-text">Créditos</span>
+      </a>
+    </nav>
+
+    <button id="collapseBtn" class="collapse-btn" title="Plegar/Desplegar">
+      <i class="fa-solid fa-thumb-tack"></i>
+    </button>
+  </aside>
+
+  <!-- Navbar -->
+  <footer id="navbar" class="navbar">
+    <div class="left">
+      <button id="sidebarToggle" class="icon-btn" title="Toggle Sidebar">
+        <i class="fas fa-angle-double-left text-xl"></i>
+      </button>
+    </div>
+    <div class="center">
+      <p style="font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif">POS system</p>
+    </div>
+
+    <div class="right pr-5">
+      {% if user.is_authenticated %}
+        <span class="user"><i class="fas fa-user text-xl"></i> {{ user.username }}</span>
+        <a class="btn" href="{% url 'logout' %}">Salir</a>
+      {% else %}
+        <a class="btn" href="{% url 'login' %}">Entrar</a>
+      {% endif %}
+      <button id="themeToggle" class="icon-btn" title="Tema">
+        <span class="icon-sun"><i class="fas fa-sun text-black text-xl"></i></span>
+        <span class="icon-moon" style="display:none"><i class="fas fa-moon text-white text-xl"></i></span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Content -->
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

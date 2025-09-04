@@ -1,0 +1,725 @@
+# Django POS – MVP (multi-tienda / multi-rol)
+
+Este documento te entrega una **base funcional** para convertir tu proyecto en un **Punto de Venta (POS)** con múltiples tiendas, roles (Administrador, Vendedor, Cliente), inventario, ventas, caja, crédito de clientes y reportes iniciales.
+
+> ⚠️ Está pensado para usar el `User` de Django (no sustituye el modelo de usuario). Los roles se gestionan con **Groups** y permisos. Multi-tenancy simple por **propiedad de tienda**.
+
+---
+
+## 1) apps y estructura sugerida
+
+Para mantener simple el MVP, puedes usar **una sola app** `pos` (o `core`) y dentro colocar los modelos. Más adelante puedes separar por dominios.
+
+```
+project/
+├─ settings.py
+├─ urls.py
+└─ pos/
+   ├─ models.py
+   ├─ views/
+   │   ├─ stores.py
+   │   ├─ products.py
+   │   ├─ sales.py
+   │   ├─ cash.py
+   │   └─ credit.py
+   ├─ urls.py
+   ├─ forms.py
+   ├─ admin.py
+   └─ templates/
+      └─ pos/
+         ├─ base.html
+         ├─ stores_list.html
+         ├─ store_form.html
+         ├─ products_list.html
+         ├─ product_form.html
+         ├─ pos_sell.html
+         ├─ cash_open.html
+         ├─ cash_close.html
+         ├─ credit_payment.html
+         └─ reports_dashboard.html
+```
+
+---
+
+## 2) `models.py` (núcleo del dominio)
+
+```python
+# pos/models.py
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+
+User = settings.AUTH_USER_MODEL
+
+# Utilidades
+class TimeStampedModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        abstract = True
+
+# ===== Tiendas y actores =====
+class Store(TimeStampedModel):
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stores")
+    name = models.CharField(max_length=150)
+    rut = models.CharField(max_length=50, blank=True)
+    address = models.CharField(max_length=200, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    def __str__(self):
+        return f"{self.name}"
+
+class Vendor(TimeStampedModel):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="vendor_profile")
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="vendors")
+    active = models.BooleanField(default=True)
+    def __str__(self):
+        return f"{self.user} @ {self.store}"
+
+class Supplier(TimeStampedModel):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="suppliers")
+    name = models.CharField(max_length=150)
+    rut = models.CharField(max_length=50, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    def __str__(self):
+        return self.name
+
+class Customer(TimeStampedModel):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="customers")
+    name = models.CharField(max_length=150)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    def __str__(self):
+        return self.name
+
+# ===== Productos / Inventario =====
+class Product(TimeStampedModel):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="products")
+    name = models.CharField(max_length=150)
+    code = models.CharField(max_length=100)
+    image = models.ImageField(upload_to="products/", blank=True, null=True)
+    cost_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sale_price = models.DecimalField(max_digits=12, decimal_places=2)
+    width = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    height = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    length = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    weight = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    low_stock_threshold = models.IntegerField(default=0)
+    suppliers = models.ManyToManyField(Supplier, blank=True, related_name="products")
+
+    class Meta:
+        unique_together = ("store", "code")  # código único por tienda
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+class Stock(TimeStampedModel):
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name="stock")
+    quantity = models.IntegerField(default=0)
+    def __str__(self):
+        return f"{self.product} : {self.quantity}"
+
+class StockMovement(TimeStampedModel):
+    REASON_CHOICES = [
+        ("SALE", "Venta"),
+        ("PURCHASE", "Compra a proveedor"),
+        ("ADJUST", "Ajuste"),
+        ("RETURN", "Devolución"),
+    ]
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="stock_movements")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="movements")
+    delta = models.IntegerField()  # positivo o negativo
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES)
+    ref = models.CharField(max_length=100, blank=True)  # id de venta/orden
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
+# ===== Compras a Proveedores =====
+class PurchaseOrder(TimeStampedModel):
+    STATUS = [("DRAFT", "Borrador"), ("SENT", "Enviada"), ("RECEIVED", "Recibida"), ("CANCELLED", "Cancelada")]
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="purchase_orders")
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name="purchase_orders")
+    status = models.CharField(max_length=10, choices=STATUS, default="DRAFT")
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+class PurchaseItem(models.Model):
+    po = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    quantity = models.IntegerField()
+    cost_price = models.DecimalField(max_digits=12, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2)
+
+# ===== Ventas / Pagos =====
+class Sale(TimeStampedModel):
+    PMETHOD = [
+        ("CASH", "Efectivo"),
+        ("CARD", "Tarjeta"),
+        ("CUSTOM", "Personalizado"),
+        ("CREDIT", "Crédito Cliente"),
+    ]
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="sales")
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="sales")
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    method = models.CharField(max_length=10, choices=PMETHOD, default="CASH")
+    note = models.CharField(max_length=200, blank=True)
+
+class SaleItem(models.Model):
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    quantity = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2)
+
+class Payment(TimeStampedModel):
+    sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="payments")
+    method = models.CharField(max_length=10, choices=Sale.PMETHOD)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+# ===== Caja =====
+class CashSession(TimeStampedModel):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="cash_sessions")
+    opened_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="cash_opened")
+    opened_at = models.DateTimeField(default=timezone.now)
+    opening_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    closed_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="cash_closed")
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closing_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    notes = models.TextField(blank=True)
+    @property
+    def is_open(self):
+        return self.closed_at is None
+
+class CashMovement(TimeStampedModel):
+    TYPE = [("IN", "Entrada"), ("OUT", "Salida")]
+    session = models.ForeignKey(CashSession, on_delete=models.CASCADE, related_name="movements")
+    type = models.CharField(max_length=3, choices=TYPE)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reason = models.CharField(max_length=200, blank=True)
+    sale = models.ForeignKey(Sale, on_delete=models.SET_NULL, null=True, blank=True)
+
+# ===== Crédito de clientes =====
+class CreditAccount(TimeStampedModel):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="credit_accounts")
+    customer = models.OneToOneField(Customer, on_delete=models.CASCADE, related_name="credit_account")
+    limit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+class CreditTxn(TimeStampedModel):
+    TYPE = [("CHARGE", "Cargo (Compra)"), ("PAYMENT", "Abono")]
+    account = models.ForeignKey(CreditAccount, on_delete=models.CASCADE, related_name="txns")
+    type = models.CharField(max_length=10, choices=TYPE)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    sale = models.ForeignKey(Sale, on_delete=models.SET_NULL, null=True, blank=True)
+    note = models.CharField(max_length=200, blank=True)
+```
+
+---
+
+## 3) `admin.py`
+
+```python
+# pos/admin.py
+from django.contrib import admin
+from .models import (
+    Store, Vendor, Supplier, Customer, Product, Stock, StockMovement,
+    PurchaseOrder, PurchaseItem, Sale, SaleItem, Payment,
+    CashSession, CashMovement, CreditAccount, CreditTxn
+)
+
+@admin.register(Store)
+class StoreAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "rut")
+    search_fields = ("name", "rut")
+
+@admin.register(Vendor)
+class VendorAdmin(admin.ModelAdmin):
+    list_display = ("user", "store", "active")
+    list_filter = ("store", "active")
+
+@admin.register(Product)
+class ProductAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "store", "sale_price")
+    list_filter = ("store",)
+    search_fields = ("code", "name")
+
+admin.site.register(Supplier)
+admin.site.register(Customer)
+admin.site.register(Stock)
+admin.site.register(StockMovement)
+admin.site.register(PurchaseOrder)
+admin.site.register(PurchaseItem)
+admin.site.register(Sale)
+admin.site.register(SaleItem)
+admin.site.register(Payment)
+admin.site.register(CashSession)
+admin.site.register(CashMovement)
+admin.site.register(CreditAccount)
+admin.site.register(CreditTxn)
+```
+
+---
+
+## 4) `forms.py` (básicos)
+
+```python
+# pos/forms.py
+from django import forms
+from .models import Store, Product, Customer
+
+class StoreForm(forms.ModelForm):
+    class Meta:
+        model = Store
+        fields = ["name", "rut", "address", "phone", "email"]
+
+class ProductForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = [
+            "name", "code", "image", "cost_price", "sale_price",
+            "width", "height", "length", "weight", "low_stock_threshold", "suppliers"
+        ]
+
+class CustomerForm(forms.ModelForm):
+    class Meta:
+        model = Customer
+        fields = ["name", "email", "phone"]
+```
+
+---
+
+## 5) `urls.py`
+
+```python
+# pos/urls.py
+from django.urls import path
+from .views import stores, products, sales, cash, credit
+
+app_name = "pos"
+urlpatterns = [
+    # tiendas
+    path("stores/", stores.store_list, name="stores_list"),
+    path("stores/new/", stores.store_create, name="store_create"),
+    path("stores/<int:pk>/edit/", stores.store_edit, name="store_edit"),
+
+    # productos
+    path("products/", products.product_list, name="products_list"),
+    path("products/new/", products.product_create, name="product_create"),
+    path("products/<int:pk>/edit/", products.product_edit, name="product_edit"),
+
+    # venta POS
+    path("sell/", sales.pos_sell, name="pos_sell"),
+    path("sell/add/<int:product_id>/", sales.add_to_cart, name="add_to_cart"),
+    path("sell/checkout/", sales.checkout, name="checkout"),
+
+    # caja
+    path("cash/open/", cash.cash_open, name="cash_open"),
+    path("cash/close/", cash.cash_close, name="cash_close"),
+
+    # crédito
+    path("credit/pay/", credit.credit_payment, name="credit_payment"),
+]
+```
+
+> Incluye esto en `project/urls.py`: `path("", include("pos.urls"))`
+
+---
+
+## 6) Vistas esenciales
+
+### 6.1 `views/stores.py`
+
+```python
+# pos/views/stores.py
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.shortcuts import render, redirect, get_object_or_404
+from ..models import Store
+from ..forms import StoreForm
+
+is_admin = user_passes_test(lambda u: u.is_authenticated and u.groups.filter(name="ADMIN").exists())
+
+@login_required
+@is_admin
+def store_list(request):
+    stores = Store.objects.filter(owner=request.user)
+    return render(request, "pos/stores_list.html", {"stores": stores, "active": "stores"})
+
+@login_required
+@is_admin
+def store_create(request):
+    if request.method == "POST":
+        form = StoreForm(request.POST)
+        if form.is_valid():
+            store = form.save(commit=False)
+            store.owner = request.user
+            store.save()
+            return redirect("pos:stores_list")
+    else:
+        form = StoreForm()
+    return render(request, "pos/store_form.html", {"form": form, "active": "stores"})
+
+@login_required
+@is_admin
+def store_edit(request, pk):
+    store = get_object_or_404(Store, pk=pk, owner=request.user)
+    if request.method == "POST":
+        form = StoreForm(request.POST, instance=store)
+        if form.is_valid():
+            form.save()
+            return redirect("pos:stores_list")
+    else:
+        form = StoreForm(instance=store)
+    return render(request, "pos/store_form.html", {"form": form, "active": "stores"})
+```
+
+### 6.2 `views/products.py`
+
+```python
+# pos/views/products.py
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+from ..models import Product, Store, Stock
+from ..forms import ProductForm
+
+@login_required
+def product_list(request):
+    # si es admin: sus tiendas; si es vendedor: su tienda
+    if request.user.groups.filter(name="ADMIN").exists():
+        stores = Store.objects.filter(owner=request.user)
+        qs = Product.objects.filter(store__owner=request.user).select_related("store")
+    else:
+        vendor = getattr(request.user, "vendor_profile", None)
+        qs = Product.objects.filter(store=vendor.store) if vendor else Product.objects.none()
+        stores = [vendor.store] if vendor else []
+
+    low = qs.filter(stock__quantity__lte=models.F("low_stock_threshold"))
+    return render(request, "pos/products_list.html", {
+        "products": qs, "low_stock": low, "stores": stores, "active": "products"
+    })
+
+@login_required
+def product_create(request):
+    # Sólo admin o vendedor de su tienda
+    if request.method == "POST":
+        form = ProductForm(request.POST, request.FILES)
+        if form.is_valid():
+            product = form.save(commit=False)
+            if request.user.groups.filter(name="ADMIN").exists():
+                # pedir tienda por querystring (?store=ID) o tomar la primera
+                store_id = request.GET.get("store")
+                if store_id:
+                    product.store = get_object_or_404(Store, pk=store_id, owner=request.user)
+                else:
+                    product.store = Store.objects.filter(owner=request.user).first()
+            else:
+                product.store = request.user.vendor_profile.store
+            product.save()
+            Stock.objects.create(product=product, quantity=0)
+            form.save_m2m()
+            return redirect("pos:products_list")
+    else:
+        form = ProductForm()
+    return render(request, "pos/product_form.html", {"form": form, "active": "products"})
+
+@login_required
+def product_edit(request, pk):
+    if request.user.groups.filter(name="ADMIN").exists():
+        product = get_object_or_404(Product, pk=pk, store__owner=request.user)
+    else:
+        product = get_object_or_404(Product, pk=pk, store=request.user.vendor_profile.store)
+
+    if request.method == "POST":
+        form = ProductForm(request.POST, request.FILES, instance=product)
+        if form.is_valid():
+            form.save()
+            return redirect("pos:products_list")
+    else:
+        form = ProductForm(instance=product)
+    return render(request, "pos/product_form.html", {"form": form, "active": "products"})
+```
+
+### 6.3 `views/sales.py` (POS simple con carrito en sesión)
+
+```python
+# pos/views/sales.py
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.shortcuts import render, redirect, get_object_or_404
+from ..models import Product, Sale, SaleItem, Payment, Stock, StockMovement, Store, Vendor, CashSession
+
+CART_KEY = "pos_cart"
+
+@login_required
+def pos_sell(request):
+    # productos visibles según rol
+    if request.user.groups.filter(name="ADMIN").exists():
+        products = Product.objects.filter(store__owner=request.user).select_related("store", "stock")
+    else:
+        vendor = request.user.vendor_profile
+        products = Product.objects.filter(store=vendor.store).select_related("store", "stock")
+
+    cart = request.session.get(CART_KEY, {})
+    # calcular total
+    total = sum(Decimal(str(item["price"])) * item["qty"] for item in cart.values()) if cart else Decimal("0")
+
+    return render(request, "pos/pos_sell.html", {
+        "products": products,
+        "cart": cart,
+        "total": total,
+        "active": "sell"
+    })
+
+@login_required
+def add_to_cart(request, product_id):
+    product = get_object_or_404(Product, pk=product_id)
+    cart = request.session.get(CART_KEY, {})
+    key = str(product_id)
+    if key in cart:
+        cart[key]["qty"] += 1
+    else:
+        cart[key] = {"name": product.name, "price": float(product.sale_price), "qty": 1}
+    request.session[CART_KEY] = cart
+    return redirect("pos:pos_sell")
+
+@login_required
+@transaction.atomic
+def checkout(request):
+    cart = request.session.get(CART_KEY, {})
+    if not cart:
+        return redirect("pos:pos_sell")
+
+    # determinar tienda y vendedor
+    if request.user.groups.filter(name="ADMIN").exists():
+        store = Store.objects.filter(owner=request.user).first()
+        vendor = Vendor.objects.filter(store=store).first()
+    else:
+        vendor = request.user.vendor_profile
+        store = vendor.store
+
+    # validar caja abierta
+    session = CashSession.objects.filter(store=store, closed_at__isnull=True).order_by("-opened_at").first()
+    if not session:
+        # puedes redirigir a abrir caja
+        return redirect("pos:cash_open")
+
+    sale = Sale.objects.create(store=store, vendor=vendor, total=0, method="CASH")
+
+    total = Decimal("0")
+    for key, item in cart.items():
+        product = Product.objects.select_for_update().get(pk=int(key), store=store)
+        qty = int(item["qty"])
+        price = Decimal(str(item["price"]))
+        subtotal = price * qty
+        SaleItem.objects.create(sale=sale, product=product, quantity=qty, unit_price=price, subtotal=subtotal)
+        total += subtotal
+        # descontar stock
+        stock, _ = Stock.objects.select_for_update().get_or_create(product=product)
+        stock.quantity -= qty
+        stock.save()
+        StockMovement.objects.create(store=store, product=product, delta=-qty, reason="SALE", ref=f"SALE-{sale.id}", user=request.user)
+
+    sale.total = total
+    sale.save()
+
+    # pago efectivo (demo). Podrías leer método y montos de un form.
+    Payment.objects.create(sale=sale, method="CASH", amount=total)
+
+    # movimiento de caja IN
+    from ..models import CashMovement
+    CashMovement.objects.create(session=session, type="IN", amount=total, reason=f"Venta #{sale.id}", sale=sale)
+
+    # limpiar carrito
+    request.session[CART_KEY] = {}
+    return redirect("pos:pos_sell")
+```
+
+### 6.4 `views/cash.py`
+
+```python
+# pos/views/cash.py
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.utils import timezone
+from ..models import CashSession, Store
+
+@login_required
+def cash_open(request):
+    if request.method == "POST":
+        amount = Decimal(request.POST.get("opening_cash", "0") or "0")
+        if request.user.groups.filter(name="ADMIN").exists():
+            store = Store.objects.filter(owner=request.user).first()
+        else:
+            store = request.user.vendor_profile.store
+        CashSession.objects.create(store=store, opened_by=request.user, opening_cash=amount)
+        return redirect("pos:pos_sell")
+    return render(request, "pos/cash_open.html", {"active": "cash"})
+
+@login_required
+def cash_close(request):
+    if request.method == "POST":
+        closing = request.POST.get("closing_cash", "0")
+        if request.user.groups.filter(name="ADMIN").exists():
+            store = Store.objects.filter(owner=request.user).first()
+        else:
+            store = request.user.vendor_profile.store
+        session = CashSession.objects.filter(store=store, closed_at__isnull=True).first()
+        if session:
+            session.closing_cash = closing
+            session.closed_by = request.user
+            session.closed_at = timezone.now()
+            session.save()
+        return redirect("pos:pos_sell")
+    return render(request, "pos/cash_close.html", {"active": "cash"})
+```
+
+### 6.5 `views/credit.py`
+
+```python
+# pos/views/credit.py
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+from ..models import CreditAccount, CreditTxn, Customer, Store
+
+@login_required
+def credit_payment(request):
+    # pago simple de crédito (abono)
+    if request.method == "POST":
+        customer_id = request.POST.get("customer")
+        amount = Decimal(request.POST.get("amount", "0") or "0")
+        if request.user.groups.filter(name="ADMIN").exists():
+            store = Store.objects.filter(owner=request.user).first()
+        else:
+            store = request.user.vendor_profile.store
+        customer = get_object_or_404(Customer, pk=customer_id, store=store)
+        account = customer.credit_account
+        account.balance -= amount
+        account.save()
+        CreditTxn.objects.create(account=account, type="PAYMENT", amount=amount, note="Abono manual")
+        return redirect("pos:credit_payment")
+
+    # GET
+    if request.user.groups.filter(name="ADMIN").exists():
+        customers = Customer.objects.filter(store__owner=request.user)
+    else:
+        customers = Customer.objects.filter(store=request.user.vendor_profile.store)
+    return render(request, "pos/credit_payment.html", {"customers": customers, "active": "credit"})
+```
+
+---
+
+## 7) Templates base (sólo estructuras)
+
+> Reusa tu `base.html`, `site.css` y `site.js` que ya tienen **sidebar + navbar + tema + Lucide**. Aquí, sólo ejemplos mínimos para cada vista.
+
+### `templates/pos/pos_sell.html`
+
+```html
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Venta</h2>
+  <input type="search" placeholder="Buscar producto…" oninput="filterProducts(this.value)">
+  <div class="grid-2" id="prodGrid">
+    {% for p in products %}
+      <div class="card">
+        <strong>{{ p.name }}</strong><br>
+        <small>{{ p.code }}</small><br>
+        <div>${{ p.sale_price }}</div>
+        <a class="btn" href="{% url 'pos:add_to_cart' p.pk %}">Agregar</a>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h3>Carrito</h3>
+  {% if cart %}
+    <ul class="list">
+      {% for pid, item in cart.items %}
+        <li>{{ item.name }} × {{ item.qty }} — ${{ item.price }}</li>
+      {% endfor %}
+    </ul>
+    <p><strong>Total: ${{ total }}</strong></p>
+    <form method="post" action="{% url 'pos:checkout' %}">{% csrf_token %}
+      <button class="btn primary">Finalizar venta</button>
+    </form>
+  {% else %}
+    <p>No hay productos en el carrito.</p>
+  {% endif %}
+</div>
+
+<script>
+function filterProducts(q){
+  q = (q||'').toLowerCase();
+  const cards = document.querySelectorAll('#prodGrid .card');
+  cards.forEach(c=>{
+    const t = c.textContent.toLowerCase();
+    c.style.display = t.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
+```
+
+*El resto de templates (stores\_list, forms, cash\_open/close, credit\_payment) pueden ser formularios simples reutilizando tus clases .card, .btn, etc.*
+
+---
+
+## 8) Roles y permisos (Groups)
+
+Ejecuta una vez en `shell` para crear grupos ADMIN / SELLER / CUSTOMER:
+
+```python
+from django.contrib.auth.models import Group
+Group.objects.get_or_create(name='ADMIN')
+Group.objects.get_or_create(name='SELLER')
+Group.objects.get_or_create(name='CUSTOMER')
+```
+
+* Asigna **ADMIN** a los usuarios que serán administradores de tiendas.
+* Crea `Vendor` para los usuarios vendedores y asígnales el **SELLER**.
+* Los clientes pueden autenticarse con `CUSTOMER` si lo necesitas; su vista sería sólo de consulta.
+
+> Multi-tenant: todos los queries filtran por `store.owner == request.user` (admin) o `vendor.store` (vendedor). Así un admin **no ve** tiendas de otros.
+
+---
+
+## 9) Flujo operativo mínimo
+
+1. Crear usuario admin, asignarlo al grupo **ADMIN**.
+2. Con ese admin, crear **Store**.
+3. Crear **Vendor** (en Admin o con un form), asignándolo a la Store.
+4. Crear **Productos** (y opcionalmente **Stock** inicial con un movimiento `ADJUST`).
+5. Abrir **Caja** (`/cash/open/`).
+6. Ir a **Vender** (`/sell/`), agregar productos, **Finalizar venta**.
+7. Cerrar **Caja** (`/cash/close/`).
+8. Si usas **Crédito**, crear `Customer` y `CreditAccount` (balance/limit). Las ventas con method `CREDIT` deben registrar `CreditTxn` (puedes ampliar `checkout`).
+
+---
+
+## 10) Migraciones y arranque
+
+```bash
+python manage.py makemigrations pos
+python manage.py migrate
+python manage.py createsuperuser
+# (opcional) cargar grupos en shell como se indicó
+```
+
+---
+
+## 11) Extensiones sugeridas (cuando quieras)
+
+* **Pedidos / Bajo Stock**: vista que filtra `stock__quantity <= low_stock_threshold` y crea `PurchaseOrder`.
+* **Pagos personalizados**: tabla de métodos o un catálogo configurable.
+* **Reportes**: vistas agregadas por rango (día/semana/mes/año) sobre `Sale` y `Payment`.
+* **HTMX/Alpine** para carrito y buscador reactivo sin recargar.
+* **Export** CSV para ventas y movimientos de caja.
+
+---
+
+Con esto tienes la **columna vertebral** del POS: multi-tienda, roles, productos con inventario, ventas con caja y crédito básico. A partir de aquí, iteramos UI/UX con tu sidebar y tema actuales. ✔️

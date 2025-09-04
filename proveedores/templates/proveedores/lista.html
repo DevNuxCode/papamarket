@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Proveedores</h1>
+<a href="{% url 'proveedores:crear' %}" class="btn primary">Nuevo proveedor</a>
+<div class="card">
+<table class="table">
+<tr><th>ID</th><th>Nombre</th><th>Tienda</th><th></th></tr>
+{% for t in items %}
+<tr>
+  <td>{{ t.id }}</td><td>{{ t.nombre }}</td><td>{{ t.tienda }}</td>
+  <td><a class="btn" href="{% url 'proveedores:editar' t.id %}">Editar</a></td>
+</tr>
+{% empty %}
+<tr><td colspan="4">No hay proveedores</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

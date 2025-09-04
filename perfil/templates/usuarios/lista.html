@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Usuarios</h1>
+<a href="{% url 'usuarios:crear' %}" class="btn btn-danger">Nueva usuario</a>
+<div class="card">
+<table class="table">
+<tr><th>ID</th><th>User</th><th>Rol</th><th>Telefono</th><th>Direccion</th><th></th></tr>
+{% for t in items %}
+<tr>
+  <td>{{ t.id }}</td><td>{{ t.user }}</td><td>{{ t.rol }}</td><td>{{ t.telefono }}</td><td>{{ t.direccion }}</td>
+  <td><a class="btn" href="{% url 'usuarios:editar' t.id %}"><i class="fa fa-pencil" aria-hidden="true"></i></a> <a class="btn-danger" href="{% url 'tiendas:eliminar' t.id %}"><i class="fa fa-trash icolor" aria-hidden="true"></i></a></td>
+</tr>
+{% empty %}
+<tr><td colspan="4">No hay Perfiles</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

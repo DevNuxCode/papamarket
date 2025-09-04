@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Tiendas</h1>
+<a href="{% url 'tiendas:crear' %}" class="btn-danger">Nueva tienda</a>
+<div class="card">
+<table class="table">
+<tr><th>ID</th><th>Nombre</th><th>RUT</th><th></th></tr>
+{% for t in items %}
+<tr>
+  <td>{{ t.id }}</td><td>{{ t.nombre }}</td><td>{{ t.rut }}</td>
+  <td><a class="btn" href="{% url 'tiendas:editar' t.id %}"><i class="fa fa-pencil" aria-hidden="true"></i></a> <a class="btn-danger" href="{% url 'tiendas:eliminar' t.id %}"><i class="fa fa-trash icolor" aria-hidden="true"></i></a></td>
+</tr>
+{% empty %}
+<tr><td colspan="4">No hay tiendas</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

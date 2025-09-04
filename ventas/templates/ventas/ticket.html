@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card ticket">
+  <h1 class="title">🧾 Ticket Venta #{{ venta.id }}</h1>
+  <p><strong>Tienda:</strong> {{ venta.tienda.nombre }}</p>
+  <p><strong>Fecha:</strong> {{ venta.fecha|date:"d/m/Y H:i" }}</p>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Cant</th>
+        <th>Precio</th>
+        <th>Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in venta.items.all %}
+      <tr>
+        <td>{{ it.producto.nombre }}</td>
+        <td>{{ it.cantidad }}</td>
+        <td>${{ it.precio }}</td>
+        <td>${{ it.subtotal }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="total-row">
+        <td colspan="3" align="right"><strong>Total</strong></td>
+        <td class="total">${{ venta.total }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pagos">
+    <div class="pago-card metodo text-red-600">
+      <strong>Método:</strong> {{ venta.metodo_pago|title }}
+    </div>
+
+    {% if venta.metodo_pago == "efectivo" %}
+      <div class="pago-card recibido">
+        <strong>Recibido:</strong> ${{ venta.recibido }}
+      </div>
+      <div class="pago-card vuelto">
+        <strong>Vuelto:</strong> ${{ venta.vuelto }}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="acciones">
+    <a class="btn" href="{% url 'ventas:pos' %}">🛒 Nueva venta</a>
+    <button class="btn primary" onclick="window.print()">🖨️ Imprimir</button>
+  </div>
+</div>
+
+{% endblock %}

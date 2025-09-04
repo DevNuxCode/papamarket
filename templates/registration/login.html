@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-blue-300 text-xl">Login</h1>
+<div class="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+<form method="post" class="space-y-4 search-box mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label class="block mt-1 pt-10 font-medium text-gray-700 dark:text-gray-300 mb-1 ">
+        {{ field.label }}
+      </label>
+      {{ field }}
+      {% if field.errors %}
+        <p class="block text-m mt-1">{{ field.errors|striptags }}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <button type="submit"
+          class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow">
+    Enviar
+  </button>
+</form>
+
+
+</div>
+{% endblock %}

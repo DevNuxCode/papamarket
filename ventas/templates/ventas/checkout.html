@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>🧾 Finalizar Venta</h2>
+  <form method="post">
+    {% csrf_token %}
+    <label>Cliente:</label>
+    <select name="cliente">
+      <option value="">Anónimo</option>
+      {% for c in clientes %}
+        <option value="{{ c.id }}">{{ c.nombre }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Método de pago:</label>
+    <select name="metodo_pago">
+      <option value="efectivo">Efectivo</option>
+      <option value="tarjeta">Tarjeta</option>
+      <option value="otro">Otro</option>
+    </select>
+
+    <label>Monto recibido (si es efectivo):</label>
+    <input type="number" name="recibido" step="0.01" min="0">
+
+    <a href="{% url 'ventas:checkout' %}" class="btn primary">Finalizar Venta</a>
+    <a href="{% url 'ventas:pos' %}" class="btn">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

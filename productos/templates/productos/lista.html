@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Productos</h1>
+<a href="{% url 'productos:crear' %}" class="btn primary">Nuevo producto</a>
+<form method="get"><input type="search" name="q" placeholder="Buscar..."></form>
+<div class="card">
+<table class="table">
+<tr><th>ID</th><th>Nombre</th><th>Tienda</th><th>Precio</th><th>Stock</th><th></th></tr>
+{% for t in items %}
+<tr>
+  <td>{{ t.id }}</td><td>{{ t.nombre }}</td><td>{{ t.tienda }}</td>
+  <td>${{ t.precio_venta }}</td><td>{{ t.stock }}</td>
+  <td><a class="btn" href="{% url 'productos:editar' t.id %}">Editar</a></td>
+</tr>
+{% empty %}
+<tr><td colspan="6">No hay productos</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

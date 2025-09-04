@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1 class="text-xl font-bold mb-4">Perfil de {{ user.username }}</h1>
+
+  <p><strong>Email:</strong> {{ user.email }}</p>
+  <p><strong>Teléfono:</strong> {{ perfil.telefono }}</p>
+  <p><strong>Dirección:</strong> {{ perfil.direccion }}</p>
+  <a href="{% url 'usuarios:editar' %}" class="btn btn-primary mt-3">
+    <i class="fas fa-user-edit"></i> Editar perfil
+  </a>
+</div>
+
+{% if perfil.rol == "vendedor" %}
+  <div class="card">
+    <h2 class="text-lg font-semibold">Tus ventas</h2>
+    <p>Total vendido: <span class="text-green-500 font-bold">${{ total_vendido }}</span></p>
+    <table class="table mt-3">
+      <thead><tr><th>ID</th><th>Fecha</th><th>Total</th></tr></thead>
+      <tbody>
+        {% for v in ventas %}
+        <tr>
+          <td>{{ v.id }}</td>
+          <td>{{ v.fecha|date:"d/m/Y H:i" }}</td>
+          <td>${{ v.total }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">No tienes ventas registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% elif perfil.rol == "cliente" %}
+  <div class="card">
+    <h2 class="text-lg font-semibold">Tus compras</h2>
+    <table class="table mt-3">
+      <thead><tr><th>ID</th><th>Fecha</th><th>Total</th></tr></thead>
+      <tbody>
+        {% for c in compras %}
+        <tr>
+          <td>{{ c.id }}</td>
+          <td>{{ c.fecha|date:"d/m/Y H:i" }}</td>
+          <td>${{ c.total }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">No has realizado compras.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

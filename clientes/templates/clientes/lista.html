@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Clientes</h1>
+<a href="{% url 'clientes:crear' %}" class="btn primary">Nuevo cliente</a>
+<div class="card">
+<table class="table">
+<tr><th>ID</th><th>Nombre</th><th>Tienda</th><th>Crédito</th><th></th></tr>
+{% for t in items %}
+<tr>
+  <td>{{ t.id }}</td><td>{{ t.nombre }}</td><td>{{ t.tienda }}</td>
+  <td>{% if t.tiene_credito %}Sí — saldo ${{ t.saldo_credito }}{% else %}No{% endif %}</td>
+  <td><a class="btn" href="{% url 'clientes:editar' t.id %}">Editar</a></td>
+</tr>
+{% empty %}
+<tr><td colspan="5">No hay clientes</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

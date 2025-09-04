@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Guardar cliente</h1>
+<form method="post" class="space-y-4">
+  {% csrf_token %}
+  {% for field in form %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        {{ field.label }}
+      </label>
+      {{ field }}
+      {% if field.errors %}
+        <p class="text-red-500 text-xs mt-1">{{ field.errors|striptags }}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <button type="submit"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow">
+    Guardar
+  </button>
+</form>
+{% endblock %}

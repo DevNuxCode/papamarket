@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block content %}
+{% url 'tiendas:lista' as lista_url %}
+{% include "components/form_card.html" with title="Guardar Tienda" form=form cancel_url=lista_url submit_label="Guardar" %}
+{% endblock %}
+
+

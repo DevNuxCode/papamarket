@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Punto de venta</h1>
+
+<!-- Tarjetas métricas -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="card text-center">
+    <p class="text-muted">Ventas hoy</p>
+    <p class="text-2xl font-bold text-green-500">${{ ventas_dia }}</p>
+  </div>
+  <div class="card text-center">
+    <p class="text-muted">Ventas esta semana</p>
+    <p class="text-2xl font-bold text-blue-500">${{ ventas_semana }}</p>
+  </div>
+  <div class="card text-center">
+    <p class="text-muted">Ventas este mes</p>
+    <p class="text-2xl font-bold text-purple-500">${{ ventas_mes }}</p>
+  </div>
+</div>
+
+<!-- Últimas ventas -->
+<h3 class="text-lg font-semibold mb-3">Últimas ventas</h3>
+<ul class="list">
+  {% for venta in ultimas_ventas %}
+    <li>
+      {{ venta.fecha|date:"H:i" }} — {{ venta.cliente.nombre|default:"Anónimo" }} — ${{ venta.total }}
+    </li>
+  {% empty %}
+    <li>No hay ventas registradas</li>
+  {% endfor %}
+</ul>
+{% endblock %}
