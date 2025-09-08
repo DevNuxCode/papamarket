@@ -245,3 +245,29 @@ html[data-theme="dark"] .search-box input[name="q"]:focus {
 .icolor{
     color: rgb(107, 2, 2);
 }
+
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #444;
+  background-color: #f3f4f6; /* gris claro */
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.logout-btn .logout-text {
+  display: none; /* Ocultamos el texto por defecto */
+  font-weight: 500;
+}
+
+.logout-btn:hover {
+  background-color: #dc2626; /* rojo */
+  color: white;
+}
+
+.logout-btn:hover .logout-text {
+  display: inline; /* Mostramos el texto en hover */
+}

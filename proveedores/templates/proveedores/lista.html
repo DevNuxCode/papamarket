@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Proveedores</h1>
-<a href="{% url 'proveedores:crear' %}" class="btn primary">Nuevo proveedor</a>
+<a href="{% url 'proveedores:crear' %}"><button class="btn btn-primary">Nuevo proveedor</button></a>
 <div class="card">
 <table class="table">
 <tr><th>ID</th><th>Nombre</th><th>Tienda</th><th></th></tr>
@@ -16,3 +16,6 @@
 </table>
 </div>
 {% endblock %}
+
+
+<a href="{% url 'proveedores:crear' %}"><button>Nuevo proveedor</button></a>
