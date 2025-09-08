@@ -1,20 +1,38 @@
 {% extends 'base.html' %}
 {% block content %}
-<h1>Productos</h1>
-<a href="{% url 'productos:crear' %}" class="btn primary">Nuevo producto</a>
-<form method="get"><input type="search" name="q" placeholder="Buscar..."></form>
-<div class="card">
-<table class="table">
-<tr><th>ID</th><th>Nombre</th><th>Tienda</th><th>Precio</th><th>Stock</th><th></th></tr>
+<div class="productos-lista">
+  <h1>Productos</h1>
+  <a href="{% url 'productos:crear' %}" class="btn primary">Nuevo producto</a>
+  <form method="get"><input type="search" name="q" placeholder="Buscar..."></form>
+  <div class="card">
+  <table class="table">
+<tr><th>Imagen</th><th>ID</th><th>Nombre</th><th>Tienda</th><th>Precio</th><th>Stock</th><th></th></tr>
 {% for t in items %}
 <tr>
+  <td>
+    {% if t.imagen %}
+      <img src="{{ t.imagen.url }}" alt="{{ t.nombre }}" class="w-12 h-12 object-cover rounded">
+    {% else %}
+      <div class="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+        <span class="text-gray-400 text-xs">Sin imagen</span>
+      </div>
+    {% endif %}
+  </td>
   <td>{{ t.id }}</td><td>{{ t.nombre }}</td><td>{{ t.tienda }}</td>
   <td>${{ t.precio_venta }}</td><td>{{ t.stock }}</td>
-  <td><a class="btn" href="{% url 'productos:editar' t.id %}">Editar</a></td>
+  <td>
+    <a class="btn" href="{% url 'productos:editar' t.id %}">Editar</a>
+    <a class="btn btn-danger delete-producto" 
+       href="{% url 'productos:eliminar' t.id %}"
+       data-producto-id="{{ t.id }}"
+       data-producto-nombre="{{ t.nombre }}">Eliminar</a>
+  </td>
 </tr>
 {% empty %}
-<tr><td colspan="6">No hay productos</td></tr>
+<tr><td colspan="7">No hay productos</td></tr>
 {% endfor %}
 </table>
 </div>
+</div>
+<script src="/static/js/productos.js"></script>
 {% endblock %}

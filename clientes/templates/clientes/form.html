@@ -1,7 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
 <h1>Guardar cliente</h1>
-<form method="post" class="space-y-4">
+<form method="post" class="space-y-4 cliente-form" 
+      data-is-edit="{% if form.instance.pk %}true{% else %}false{% endif %}" 
+      data-redirect-url="{% url 'clientes:lista' %}">
   {% csrf_token %}
   {% for field in form %}
     <div>
@@ -19,4 +21,5 @@
     Guardar
   </button>
 </form>
+<script src="/static/js/clientes.js"></script>
 {% endblock %}

@@ -14,7 +14,7 @@ def lista(request):
 @login_required
 def crear(request):
     if request.method=='POST':
-        form = ProductoForm(request.POST)
+        form = ProductoForm(request.POST, request.FILES)
         if form.is_valid() and form.cleaned_data['tienda'].owner == request.user:
             form.save()
             return redirect('productos:lista')
@@ -27,14 +27,14 @@ def crear(request):
 def editar(request, pk):
     obj = get_object_or_404(Producto, pk=pk, tienda__owner=request.user)
     if request.method=='POST':
-        form = ProductoForm(request.POST, instance=obj)
+        form = ProductoForm(request.POST, request.FILES, instance=obj)
         if form.is_valid():
             form.save()
             return redirect('productos:lista')
     else:
         form = ProductoForm(instance=obj)
         form.fields['tienda'].queryset = form.fields['tienda'].queryset.filter(owner=request.user)
-    return render(request, 'productos/form.html', {'form': form})
+    return render(request, 'productos/form.html', {'form': form, 'producto': obj})
 
 @login_required
 def eliminar(request, pk):

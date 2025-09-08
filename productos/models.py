@@ -14,7 +14,7 @@ class Producto(models.Model):
     ancho = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     largo = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     peso = models.DecimalField(max_digits=8, decimal_places=2, default=0)
-    imagen = models.URLField(blank=True)
+    imagen = models.ImageField(upload_to='productos/', blank=True, null=True)
     proveedores = models.ManyToManyField(Proveedor, blank=True, related_name='productos')
 
     def __str__(self):
