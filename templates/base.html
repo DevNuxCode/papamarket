@@ -67,6 +67,11 @@
         <span class="menu-icon"><i class="fas fa-credit-card"></i></span>
         <span class="menu-text">Créditos</span>
       </a>
+
+       <a href="{% url 'perfil:perfil' %}" class="menu-item {% if request.resolver_match.app_name == 'creditos' %}active{% endif %}">
+        <span class="menu-icon"><i class="fas fa-user"></i></span>
+        <span class="menu-text">Perfil</span>
+      </a>
     </nav>
 
     <button id="collapseBtn" class="collapse-btn" title="Plegar/Desplegar">
